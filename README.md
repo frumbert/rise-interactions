@@ -1,30 +1,25 @@
-# Learning Journal for Articulate Rise
+# Articulate Rise custom interactions
 
-The Learning Journal allows a learner of an Articulate Rise course to enter text responses to journal prompts throughout a Rise module. At the end of the module, the learner can print their learning journal of all their responses. The responses are saved to the browser so that they persist on future visits to the Rise course.
+This script library is an addition to the published Rise 360 package which extends the functionality of different block types to provide extra styling and interaction capabilities.
 
-See the example Rise course at http://amelangrise.s3.amazonaws.com/learningjournal/index.html
+## Thanks
 
+Concept based on https://github.com/mikeamelang/learning-journal. 
 
-## Use
+## Why
 
-### 1. Edit the Rise Course
+Because clients often ask for more flexibility, and Articulate are sluggish at implementing any new features.
 
-For detailed instructions on how to add the Learning Journal to the Rise course, see the [HOW-TO](https://github.com/mikeamelang/learning-journal/raw/master/Learning%20Journal%20HOW-TO.docx).
+## How
 
-### 2. Add the Learning Journal files
+Publish your package, then copy the script/style files to the `scormcontent` folder inside the zip, and modify the `index.html` in the same location to include the following lines into the `head` tag (alongside other scripts).
 
-After outputting the Rise course, the following two files must be included alongside the index.html file of the Rise course:
-* Learningjournal.js
-* Learningjournal.css
+TODO: support injecting this code through https://www.frumbert.org/risefix/index.php
 
-### 3. Edit the index.html
-
-These two files must be linked in the index.html by including the following three lines in the `<head>` of the index.html file of the Rise course:
 
 ```
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-<link type="text/css" rel="stylesheet" href="learningjournal.css">
-<script src="learningjournal.js"></script>
+<link type="text/css" rel="stylesheet" href="interactions.css">
+<script src="interactions.js"></script>
 ```
 
 ## Notes
