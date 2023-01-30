@@ -1,3 +1,63 @@
+:root {
+  --backdrop: #ffffff40;
+}
+/* INTERATION::BUTTONS & others that contain buttons */
+.blocks-button--extended .blocks-button__button {
+  max-width: fit-content;
+}
+
+.button-minimal {
+  max-width: unset;
+  min-width: unset;
+  width: fit-content;
+}
+
+/* INTERACTION::DETAILS */
+.blocks-details__container strong {
+  font-weight: bold;
+}
+
+/* FLAG::MULTILINE */
+.blocks-accordion__multiline,
+body.flag-multiline .blocks-accordion__title {
+  overflow: visible !important;
+  white-space: normal !important;
+}
+
+/* INTERACTION::DIALOG */
+dialog::backdrop {
+  background-color: var(--backdrop);
+  position: fixed;
+  top:0;left:0;right:0;bottom:0;
+}
+
+.float-left {
+  float: left;
+  margin-right: 3rem;
+}
+
+.float-right {
+  float: right;
+  margin-left: 3rem;
+}
+
+.block-image .noresize { width: unset; min-width: unset; max-width: 100%; }
+
+.block-image .float-right:not(.noresize),
+.block-image .float-left:not(.noresize) {
+  width: 50%;
+}
+
+.block-image--large .float-right:not(.noresize),
+.block-image--large .float-left:not(.noresize) {
+  width: 75%;
+}
+
+.block-image--small .float-right:not(.noresize),
+.block-image--small .float-left:not(.noresize) {
+  width: 25%;
+}
+
 
 /* set the background color of journal entries */
 .block-impact--note-journalentry {

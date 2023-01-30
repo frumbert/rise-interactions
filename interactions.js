@@ -1,60 +1,16 @@
-/*
-
-  Custom Learning Journal in Rise
-  -------------------------------
-
-  version: 2.1
-  Project page: https://github.com/mikeamelang/learning-journal
-
-
-  The Learning Journal allows a learner to enter text responses to
-  journal prompts throughout a Rise module. At the end of the module, the learner
-  can print their “learning journal” of all their responses. The responses are saved
-  to the computer so that they persist on future visits to the Rise module.
-
-  HOW TO ADD JOURNAL PROMPTS:
-  Wherever a Journal Entry is needed in the Rise module, add a new block of type
-  “NOTE” from the “STATEMENT” area and enter the following text:
-
-    Journal Entry
-    Section: <insert section name here>
-    Prompt: <insert prompt here>
-    Take Action: yes <if this is a Take Action item>
-
-  HOW TO ADD AN INTRO TO A SECTION ON THE PRINTED JOURNAL:
-  Wherever an intro to a section is needed in the Rise module, add a new block of type
-  “NOTE” from the “STATEMENT” area and enter the following text:
-
-    Section Intro
-    Section: <insert section name here>
-    Section Order: <insert printing order number here. This is optional)
-    Intro Title: <insert title to the intro here, like Reflection Activity>
-    Intro Text: <insert the text of the intro here>
-
-  HOW TO ADD PRINT BUTTONS OR PROVIDE A CUSTOM TITLE TO THE LEARNING JOURNAL:
-  Two print buttons will be shown: Print all journal items and Print take
-  action items only. (The actual text of these buttons is customized with the variables below:
-  PrintAllButton_Text, PrintTakeActionsOnly_Text and EmailButton_Text)
-  Wherever the print buttons are desired in the Rise module, add a new block of type
-  “NOTE” from the “STATEMENT” area and enter the following text:
-
-    Journal Buttons
-    Course Title: <insert course title here>
-    Include Email Button: <yes/no> (This is not required. Default is no.)
-    Email Address: <insert email to which journals will be emailed> (This is only required
-      if the above "Include Email Button" is set to true.)
-
-*/
+function attachScripts(srcs) {
+  for (src of srcs) {
+    const node = document.createElement('script');
+    node.type = 'text/javascript';
+    node.src = src;
+    document.head.appendChild(node);
+  }
+}
+attachScripts(['https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js','https://cdn.jsdelivr.net/npm/jquery@3.6.3/dist/jquery.min.js']);
 
 // These css selectors select the Notes and select the contents of each Note
 var noteSelector =  ".block-impact--note .block-impact__row"; // "[aria-label='Note']";
 var noteContentsSelector = '.fr-view';
-
-// These are the flags that must appear at the first line of the Note or the
-// Note will not be successfully processed
-var flagEntry = "Journal Entry";
-var flagButtons = "Journal Buttons";
-var flagIntro = "Section Intro";
 
 // These are the labels that accompany the data. These must be entered exactly
 // correct or the Note will not be successfully processed
@@ -85,11 +41,12 @@ var courseTitle = '';
 // localStorageItem is the item in localStorage where the journal entry data is stored.
 // a unique identifier is formed by concatenating
 // localStorageItem_prefix and the URL path up to the html file.
-var localStorageItem_prefix = 'LearningJournal_';
+var localStorageItem_prefix = 'Interactions_';
 var localStorageItem = '';
 
 // image in the printed journal header
-var imageIntroHeader = 'http://amelangrise.s3.amazonaws.com/SharedAssets/images/Reflection_Dark.png';
+// if 'interactions.png' exists in this folder, it will be used, otherwise the header is omitted
+var imageIntroHeader;
 
 // These are the settings used by the autosave of journal entries
 var typingTimer;                //  timer identifier
@@ -98,17 +55,68 @@ var doneTypingInterval = 400;  //  time in ms
 // Test if browser is firefox (used in printEntries)
 var isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 
+let cache = [];
+
 /* ------------------------------------------------------------------------------------------------ */
+function waitForElm(selector) {
+    return new Promise(resolve => {
+        if (document.querySelector(selector)) {
+            return resolve(document.querySelector(selector));
+        }
+
+        const observer = new MutationObserver(mutations => {
+            if (document.querySelector(selector)) {
+                resolve(document.querySelector(selector));
+                observer.disconnect();
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    });
+}
+
+// Rise dynamically loads and appends lessons; we often need to wait unti the next element exists before executing code.
+function waitForNextSibling(me) {
+  return new Promise(resolve => {
+    if (me.nextElementSibling) {
+        return resolve(me.nextElementSibling);
+    }
+
+    const observer = new MutationObserver(mutations => {
+        if (me.nextElementSibling) {
+            resolve(me.nextElementSibling);
+            observer.disconnect();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+  });
+}
 
 
-$(document).ready(function() {
-  setlocalStorageItem();
-  getSectionsfromLocalStorage();
-  initialProcessNotes();
-  addEvents();
+window.addEventListener('load', function initInteractions() {
+  waitForElm('section.blocks-lesson').then((lessonSection) => {
+    setlocalStorageItem();
+    getSectionsfromLocalStorage();
+    initialProcessNotes();
+    addEvents();
 
+    var img = new Image();
+    img.onload = function () {
+      imageIntroHeader = img.src;
+    }
+    img.onerror = function () {
+      imageIntroHeader = undefined;
+    }
+    img.src = 'interactions.png';
+  });
 });
-
 
 /**
   * @desc sets the value for the variable localStorageItem by concatenating
@@ -131,7 +139,7 @@ function setlocalStorageItem() {
 function initialProcessNotes(  ) {
   var MAX_INSTANCES = 5;
   var instances = 0;
-  var myInterval = setInterval(myTimerProcessNotes, 300);
+  var myInterval = setInterval(myTimerProcessNotes, 345);
   function myTimerProcessNotes() {
     instances++;
     if (instances === MAX_INSTANCES ) {
@@ -149,23 +157,28 @@ function initialProcessNotes(  ) {
   * @return none
 */
 function addEvents() {
-
-  // fire processNotes when the url changes
-  function hashchanged(){
-    processNotes();
-  }
-  window.addEventListener("hashchange", hashchanged, false);
-
-  // fire processNotes when the CONTINUE button is clicked and new blocks are dynamically added
-  function nodeadded(event) {
-    if( event.relatedNode.nodeName == "SECTION" ) {
-      if ( event.relatedNode.className == "blocks-lesson" ) {
-        processNotes();
-      }
+  function changeObserver(event) {
+    if (event.type=='hashchange' || (event.relatedNode && event.relatedNode.nodeName == "SECTION" && event.relatedNode.className == "blocks-lesson")) {
+      processNotes();
     }
-
   }
-  window.addEventListener("DOMNodeInserted", nodeadded, false);
+  window.addEventListener("hashchange", changeObserver, false);
+  window.addEventListener("DOMNodeInserted", changeObserver, false);
+
+  // Set up autosave of journal entries to UserData and to localStorage
+  // see https://stackoverflow.com/questions/4220126/run-javascript-function-when-user-finishes-typing-instead-of-on-key-up?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+  $(document).on('keyup', '.journalentry-response', function(){
+      clearTimeout(typingTimer);
+      var myentrycontainer = this.parentNode;
+      typingTimer = setTimeout(function() {
+        var response = myentrycontainer.querySelector('.journalentry-response').value;
+        var sectionid = myentrycontainer.dataset.sectionid;
+        var entryid = myentrycontainer.dataset.entryid;
+        UserData.Sections[sectionid].entries[entryid].response = response;
+        setSectionstoLocalStorage();
+      }, doneTypingInterval);
+  });
+
 }
 
 
@@ -228,37 +241,42 @@ function getSectionsfromLocalStorage() {
   }
 }
 
+function removeElement(el) {
+  if (el) el.parentNode.removeChild(el);
+}
 
 /**
-  * @desc This is the workhorse of the learning journal. It finds all the Notes on the page
-  *   and processes them depending on what type of Note it is
+  * @desc This is the workhorse of the interaction processor. It finds all the supported references on the page
+  *   and processes them depending on what type of entity it is
   * @param none
   * @return true if Notes were found
 */
 function processNotes() {
 
-    var $notes = $( noteSelector);
+    var $notes = $( noteSelector );
     var returnValue = ($notes.length > 0) ? true : false ;
 
     $notes.each( function() {
       switch (this.querySelector(noteContentsSelector).firstChild.innerText.trim()) {
-        case flagEntry:
-          processEntry( this );
-          this.parentNode.removeChild(this);
-          break;
 
-        case flagButtons:
-          processButtons( this);
-          this.parentNode.removeChild(this);
-          break;
+        case "INTERACTION::TEXT-ENTRY": processTextbox(this); break;
+        case "INTERACTION::BUTTONS": processButtons(this); break;
+        case "INTERACTION::DETAILS": processDetails(this); break;
+        case "INTERACTION::CASESTUDY": processDialog(this); break;
+        case "INTERACTION::DIALOG": processDialog(this); break;
+        case "INTERACTION::REFERENCES": processReferences(this); break;
+        case "JOURNAL::ENTRY": processEntry(this); break;
+        case "JOURNAL::BUTTONS": processButtons(this); break;
+        case "SECTION::INTRO": processIntro(this); break;
+        case "FLAG::FLOAT": floatImage(this); break;
+        case "FLAG::FLOATRAW": floatImage(this, true); break;
+       // case "FLAG::TABS::EXPAND": fixTabs(this); break;
+        case "FLAG::MULTILINE": fixAccordion(this); break;
+        case "FLAG::CONTINUE": mimicContinue(this); break;
+        case "FLAG::BGCOLOR": setBackgroundColour(this); break;
+        case "FLAG::EDGECOLOR": setEdgeColour(this); break;
 
-        case flagIntro:
-          processIntro( this );
-          this.parentNode.removeChild(this);
-          break;
-
-        default:
-          break;
+        default: break;
       }
 
     });
@@ -313,6 +331,8 @@ function processEntry( note ) {
 
     renderEntrytoDOM( note.parentNode, entry, indexSection, indexEntry );
   }
+
+  removeElement(note);
 }
 
 
@@ -442,6 +462,8 @@ function processButtons( note ) {
     container.appendChild(button3);
     note.parentNode.appendChild(container);
   }
+
+  removeElement(note);
 }
 
 
@@ -503,6 +525,8 @@ function processIntro( note ) {
     UserData.Sections.sort( compareOrders )
   }
 
+  removeElement(note);
+
   // SUB function
   // Sorts an array of objects on a particular property
   function compareOrders( a, b ) {
@@ -517,19 +541,7 @@ function processIntro( note ) {
 }
 
 
-// Set up autosave of journal entries to UserData and to localStorage
-// see https://stackoverflow.com/questions/4220126/run-javascript-function-when-user-finishes-typing-instead-of-on-key-up?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-$(document).on('keyup', '.journalentry-response', function(){
-    clearTimeout(typingTimer);
-    var myentrycontainer = this.parentNode;
-    typingTimer = setTimeout(function() {
-      var response = myentrycontainer.querySelector('.journalentry-response').value;
-      var sectionid = myentrycontainer.dataset.sectionid;
-      var entryid = myentrycontainer.dataset.entryid;
-      UserData.Sections[sectionid].entries[entryid].response = response;
-      setSectionstoLocalStorage();
-    }, doneTypingInterval);
-});
+
 
 
 /**
@@ -705,4 +717,222 @@ function getTimestamp() {
 // Polyfill for isNaN
 Number.isNaN = Number.isNaN || function(value) {
     return value !== value;
+}
+
+function createTextLinks(text) {
+  return (text || '').replace(/([^\S]|^)(((https?\:\/\/)|(www\.))(\S+))/gi, function (match, space, url) {
+    var hyperlink = url;
+    if (!hyperlink.match('^https?://')) {
+      hyperlink = 'http://' + hyperlink;
+    }
+    return space + '<a href="' + hyperlink + '" target="_blank">' + url + '</a>';
+  });
+}
+
+// get the note data as a document fragment; skip first element (already consumed); can delete original note
+// cache in case we try to process the node more than once
+function getNoteData(note) {
+  const block = note.closest("div[data-block-id]");
+  if (block.dataset.blockId in cache) {
+    return {
+      id: block.dataset.blockId,
+      fragment: block[block.dataset.blockId]
+    }
+  } else {
+    const node = note.querySelector(noteContentsSelector);
+    if (!node.childNodes.length) return;
+    const frag = new DocumentFragment();
+    if (node.firstChild) node.removeChild(node.firstChild);
+    while (node.childNodes.length) {
+      frag.appendChild(node.firstChild);
+    }
+    cache[block.dataset.blockId] = frag;
+    return {
+      id: block.dataset.blockId,
+      fragment: frag
+    }
+  }
+}
+
+// function setHtml(node,html) {
+// node.innerHTML = `<div class="animated fadeInGrow" style="animation-duration: 0.5s; opacity: 1; animation-delay: 0s;">${html}</div>`;
+// }
+
+function processTextbox(note) {
+  const data = getNoteData(note);
+
+  const template = `
+    <section class="blocks-textbox__container">
+      <textarea id="textarea-${data.id}" rows="5" cols="80" style="width:100%;resize:vertical;" placeholder="${data.fragment.textContent}"></textarea>
+      <div id="savehint-${data.id}" hidden>Saved</div>
+    </section>
+  `;
+  note.parentNode.innerHTML = template;
+  runTextbox(data.id);
+}
+function runTextbox(id) {
+  // populate value if set
+  // set up keyup listener
+}
+
+// create a horizontal row of buttons that link to things
+function processButtons(note) {
+  const data = getNoteData(note);
+  let template = `<section class="blocks-button__container blocks-button--extended blocks-button--rounded" style="justify-content: space-between;">`;
+  Array.from(data.fragment.childNodes).forEach(function(value,index) {
+    const [text,link] = value.textContent.split("::");
+    template += `<a class="blocks-button__button brand--ui" role="button" style="background-color: var(--color-accent)" href="${link}" target="_blank">${text}</a>`;
+  });
+  note.parentNode.innerHTML = `${template}</section>`;
+}
+
+// create a html details expanding section (doesn't remember state)
+function processDetails(note) {
+  const data = getNoteData(note);
+  let template = `<section class="blocks-details__container"><details>`;
+  let firstLine = 0;
+  Array.from(data.fragment.childNodes).forEach(function(value,index) {
+    if (index === firstLine && value.textContent.trim() !== '') {
+      template += `<summary style="cursor:pointer">${value.outerHTML.replace(/<\/?p[^>]*>/g, "")}</summary>`;
+    } else if (index === firstLine && value.textContent.trim() === '') {
+      firstLine += 1;
+    } else {
+      template += value.outerHTML;
+    }
+  });
+  note.parentNode.innerHTML = `${template}</details></section>`;
+}
+
+// create a html dialog which with close button
+function processDialog(note) {
+  const data = getNoteData(note);
+  let template = `<section class="blocks-button__container blocks-button--extended blocks-button--rounded" style="justify-content: space-around;">`;
+  Array.from(data.fragment.childNodes).forEach(function(value,index) {
+    switch (index) {
+      case 0: 
+        template += `<a class="blocks-button__button brand--ui" role="button" style="background-color: var(--color-accent);cursor:pointer;" onclick="document.querySelector('#dialog_${data.id}').showModal()">${value.textContent}</a>`;
+        break;
+
+      case 1:
+        template += `<dialog id='dialog_${data.id}' style='font-family:var(--font-family-body);border-color:var(--border-color-accent);box-shadow:0 .4rem 1.2rem .2rem rgba(0,0,0,.05)'>
+          <form method='dialog'>
+            <div style='text-align: right'>
+              <button value='cancel' style='font-size:2.5rem;border:none;background:transparent;box-shadow:none;padding:1rem;color:var(--color-accent);' aria-role='button' type='button' onclick="document.querySelector('#dialog_${data.id}').close()">&times;</button>
+            </div>
+          </form>`;
+        // no break
+
+      default:
+        template += value.outerHTML;
+    }
+  });
+  note.parentNode.innerHTML = `${template}</dialog></section>`;
+}
+
+// turn a list of links into a list of buttons which reveal a paragraph below (like tabs but using buttons)
+function processReferences(note) {
+  const data = getNoteData(note);
+  let links = '', references = '';
+  Array.from(data.fragment.childNodes).forEach(function(value,index) {
+    const [text,reference] = value.textContent.split("::");
+    links += `<a class="blocks-button__button brand--ui button-minimal" data-p="ref_${data.id}_${index}" role="button" style="background-color: var(--color-accent); cursor:pointer;" onclick="document.querySelectorAll('#ref_${data.id}>p').forEach(function(el){el[(event.target.dataset.p==el.id)?"removeAttribute":"setAttribute"]('hidden','hidden')}">${text}</a>`;
+    references += `<p id="ref_${data.id}_${index}" hidden>${createTextLinks(reference)}</p>`;
+  });
+  note.parentNode.innerHTML = `<section class="blocks-references__container">
+   <div class="blocks-button__container blocks-button--extended blocks-button--rounded" style="justify-content: space-between;">
+    ${links}
+   </div>
+   <div class="blocks-display__container" id="ref_${data.id}">
+    ${references}
+   </div>
+  </section>`;
+}
+
+// takes 'image & text' and turn it into a floated image (maintaining size, functionality & alignment)
+function floatImage(note, raw) {
+  const me = note.closest("div[data-block-id]");
+  if (cache[me.dataset.blockId]) return;
+  cache[me.dataset.blockId] = true;
+  waitForNextSibling(me).then((block) => {
+    me.parentNode && me.parentNode.removeChild(me);
+    if (!block.querySelector('.block-image')) return;
+    const figure = block.querySelector('.block-image__figure'); // the image, might be a <figure> or a <div>
+    const col = block.querySelector('.block-image__text').closest('.block-image__col'); // the column to keep
+    if (col) { // may have already been patched
+      figure.classList.add(col.previousElementSibling ? 'float-left' : 'float-right');
+      if (raw) figure.classList.add('noresize');
+      const target = col.querySelector(noteContentsSelector); // where to insert
+      target.insertBefore(figure,target.firstChild); // moves the image container node
+      for (node of col.parentNode.childNodes) {
+        if (node!==col) node.parentNode.removeChild(node);
+      }
+      col.parentNode.appendChild(col.firstChild); // moves content out of column (expand to fill space)
+      col.parentNode.removeChild(col);
+    }
+  });
+}
+
+// this flag is global once applied
+function fixAllAccordions(note) {
+  document.body.classList.add("flag-multiline");
+  const me = note.closest("div[data-block-id]");
+  me.parentNode && me.parentNode.removeChild(me);
+}
+
+// tells the next element to have multi-line titles
+function fixAccordion(note) {
+  const me = note.closest("div[data-block-id]");
+  if (cache[me.dataset.blockId]) return;
+  cache[me.dataset.blockId] = true;
+  waitForNextSibling(me).then((block) => {
+    // if the element wasn't an accordion, the following line won't match and nothing will happen.
+    Array.from(block.querySelectorAll('.blocks-accordion__title')).forEach(function(el) {
+      el.classList.add('blocks-accordion__multiline');
+    });
+    me.parentNode && me.parentNode.removeChild(me);
+  });
+}
+
+function mimicContinue(note) {
+  const me = note.closest("div[data-block-id]");
+  if (cache[me.dataset.blockId]) return;
+  cache[me.dataset.blockId] = true;
+  waitForNextSibling(me).then((block) => {
+    me.parentNode && me.parentNode.removeChild(me);
+  });
+}
+
+// sets the background of the NEXT block to be the same as this NOTE block, then removes this note block
+function setBackgroundColour(note) {
+  const me = note.closest("div[data-block-id]");
+  if (cache[me.dataset.blockId]) return;
+  cache[me.dataset.blockId] = true;
+  waitForNextSibling(me).then((block) => {
+    const noteStyle = window.getComputedStyle(me.querySelector('.block-impact--note'));
+    let target = block.querySelector('div[class^="block-"]');
+    if (Object.isFrozen(target.getAttribute('style'))) { // some do, some don't. Rise lacks internal consistency. Something to do with 'legacy' blocks?
+      target = target.querySelector('div'); // first one inside it
+    }
+    target.style.backgroundColor = noteStyle.backgroundColor;
+    me.parentNode && me.parentNode.removeChild(me);
+  });
+}
+
+
+function setEdgeColour(note) {
+  const me = note.closest("div[data-block-id]");
+  if (cache[me.dataset.blockId]) return;
+  cache[me.dataset.blockId] = true;
+  waitForNextSibling(me).then((block) => {
+    const style = window.getComputedStyle(me.querySelector('.block-impact--note'));
+    block.childNodes[0].childNodes[0].style.setProperty('--background-color-accent', style.backgroundColor); // set global for this element
+    Array.from(block.querySelectorAll('.timeline-card__description .fr-view :first-child')).forEach(function(el) {
+      if (el.textContent.indexOf('FLAG::EDGECOLOR::')!==-1) { // find colours defined inside descriptions
+        const value = el.innerHTML.substr(0,30).split('::')[2];
+        el.closest('.timeline-card').style.setProperty('--background-color-accent', value);
+        el.innerHTML = el.innerHTML.replace(`FLAG::EDGECOLOR::${value}::`,'');
+      }
+      me.parentNode && me.parentNode.removeChild(me);
+    });
+  });
 }
