@@ -49,4 +49,6 @@ TODO: support injecting this code through https://www.frumbert.org/risefix/index
 
 ## Notes
 
-The formatting can be customized by using the Learningjournal.css file.
+The formatting can be customized by using the `interactions.css` file.
+
+If an `interactions.png` file exists in the folder, it will be used at the top of printable views.
