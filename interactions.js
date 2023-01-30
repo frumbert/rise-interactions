@@ -1,12 +1,20 @@
 function attachScripts(srcs) {
   for (src of srcs) {
-    const node = document.createElement('script');
-    node.type = 'text/javascript';
-    node.src = src;
-    document.head.appendChild(node);
+    if (src.indexOf('.css')!==-1) {
+      const style = document.createElement('link');
+      link.rel = "stylsheet";
+      link.type = "text/css";
+      link.href = src;
+      document.head.appendChild(link);
+    } else {
+      const node = document.createElement('script');
+      node.type = 'text/javascript';
+      node.src = src;
+      document.head.appendChild(node);
+    }
   }
 }
-attachScripts(['https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js','https://cdn.jsdelivr.net/npm/jquery@3.6.3/dist/jquery.min.js']);
+attachScripts(['https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js','https://cdn.jsdelivr.net/npm/jquery@3.6.3/dist/jquery.min.js','interactions.css']);
 
 // These css selectors select the Notes and select the contents of each Note
 var noteSelector =  ".block-impact--note .block-impact__row"; // "[aria-label='Note']";
@@ -262,7 +270,6 @@ function processNotes() {
         case "INTERACTION::TEXT-ENTRY": processTextbox(this); break;
         case "INTERACTION::BUTTONS": processButtons(this); break;
         case "INTERACTION::DETAILS": processDetails(this); break;
-        case "INTERACTION::CASESTUDY": processDialog(this); break;
         case "INTERACTION::DIALOG": processDialog(this); break;
         case "INTERACTION::REFERENCES": processReferences(this); break;
         case "JOURNAL::ENTRY": processEntry(this); break;
